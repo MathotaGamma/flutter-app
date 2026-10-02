@@ -69,8 +69,10 @@ jobs:
           mkdir -p ~/.gradle/init.d
           cat > ~/.gradle/init.d/force-compile-sdk.gradle <<EOF
           allprojects { p ->
-            p.plugins.withId('com.android.library') {
-              p.afterEvaluate {
+            // 各プロジェクトの評価前にafterEvaluateを登録する
+            // (AGP自身のafterEvaluateより先に実行させるため)
+            p.afterEvaluate {
+              if (p.plugins.hasPlugin('com.android.library')) {
                 p.android.compileSdkVersion ${FORCE_COMPILE_SDK}
               }
             }
