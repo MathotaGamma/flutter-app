@@ -1,18 +1,21 @@
-# v1からの差分:
-# - name を sample_counter から flutterapptest に変更
-#   (パッケージ名 com.lupargent.flutterapptest に合わせるため)
-
-name: flutterapptest
-description: GitHub Actionsでビルドするサンプルのカウンターアプリ
-publish_to: "none"
+name: mailrtc
+description: メールで接続情報を交換するWebRTC P2Pチャット
+publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
+  flutter_webrtc: ^0.12.0
+  url_launcher: ^6.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
 
 flutter:
   uses-material-design: true
