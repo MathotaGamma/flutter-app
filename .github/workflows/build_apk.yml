@@ -1,21 +1,12 @@
-# v2からの差分:
-# - Webビルド(flutter build web)を追加し、GitHub Pagesへ自動公開
-# - 雛形の自動生成を android と web の両方に対応
-# - Pages公開用に permissions へ pages: write と id-token: write を追加
-# - deployジョブを追加(buildジョブ完了後に実行)
-# (APKのReleases公開、パッケージ名 com.lupargent.flutterapptest は v2 と同じ)
-
-name: Flutter Build APK and Web
+name: Build APK
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pages: write
-  id-token: write
+env:
+  APP_ORG: com.lupargent
 
 jobs:
   build:
@@ -28,7 +19,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: '17'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -36,10 +27,39 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Create scaffold if missing
+      - name: Ensure Android project exists
         run: |
-          if [ ! -d android ] || [ ! -d web ]; then
-            flutter create --platforms=android,web --org com.lupargent --project-name flutterapptest .
+          if [ ! -d android ]; then
+            echo "android/ not found. Generating..."
+            cp lib/main.dart /tmp/main.dart.bak
+            cp pubspec.yaml /tmp/pubspec.yaml.bak
+            flutter create --org "$APP_ORG" --platforms android .
+            cp /tmp/main.dart.bak lib/main.dart
+            cp /tmp/pubspec.yaml.bak pubspec.yaml
+            rm -rf test
+          else
+            echo "android/ already exists. Skipping generation."
+          fi
+
+      - name: Patch AndroidManifest
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
+            sed -i '0,/<manifest[^>]*>/s//&\n  <uses-permission android:name="android.permission.INTERNET" \/>\n  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" \/>/' "$MANIFEST"
+          fi
+          if ! grep -q 'scheme="mailto"' "$MANIFEST"; then
+            sed -i 's#</manifest>#  <queries>\n    <intent>\n      <action android:name="android.intent.action.SENDTO" />\n      <data android:scheme="mailto" />\n    </intent>\n  </queries>\n</manifest>#' "$MANIFEST"
+          fi
+          cat "$MANIFEST"
+
+      - name: Set minSdk to 21
+        working-directory: android/app
+        run: |
+          if [ -f build.gradle.kts ]; then
+            sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/' build.gradle.kts
+          fi
+          if [ -f build.gradle ]; then
+            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' build.gradle
           fi
 
       - name: Install dependencies
@@ -48,31 +68,9 @@ jobs:
       - name: Build release APK
         run: flutter build apk --release
 
-      - name: Publish APK to Releases
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          cp build/app/outputs/flutter-apk/app-release.apk flutterapptest-${{ github.run_number }}.apk
-          gh release create "build-${{ github.run_number }}" \
-            "flutterapptest-${{ github.run_number }}.apk" \
-            --title "Build ${{ github.run_number }}" \
-            --notes "Automated build from commit ${{ github.sha }}"
-
-      - name: Build web
-        run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          path: build/web
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          name: mailrtc-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
