@@ -1,9 +1,17 @@
+# v1からの差分:
+# - Artifacts(ZIP)をやめ、GitHub ReleasesにAPKを直接公開(解凍不要)
+# - パッケージ名を com.lupargent.flutterapptest に指定
+# - Releases作成のため permissions: contents: write を追加
+
 name: Flutter Build APK
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -27,7 +35,7 @@ jobs:
       - name: Create Android scaffold if missing
         run: |
           if [ ! -d android ]; then
-            flutter create --platforms=android .
+            flutter create --platforms=android --org com.lupargent --project-name flutterapptest .
           fi
 
       - name: Install dependencies
@@ -36,9 +44,12 @@ jobs:
       - name: Build release APK
         run: flutter build apk --release
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 14
+      - name: Publish APK to Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk flutterapptest-${{ github.run_number }}.apk
+          gh release create "build-${{ github.run_number }}" \
+            "flutterapptest-${{ github.run_number }}.apk" \
+            --title "Build ${{ github.run_number }}" \
+            --notes "Automated build from commit ${{ github.sha }}"
