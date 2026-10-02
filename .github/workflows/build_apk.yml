@@ -1,9 +1,11 @@
-# v1からの差分:
-# - Artifacts(ZIP)をやめ、GitHub ReleasesにAPKを直接公開(解凍不要)
-# - パッケージ名を com.lupargent.flutterapptest に指定
-# - Releases作成のため permissions: contents: write を追加
+# v2からの差分:
+# - Webビルド(flutter build web)を追加し、GitHub Pagesへ自動公開
+# - 雛形の自動生成を android と web の両方に対応
+# - Pages公開用に permissions へ pages: write と id-token: write を追加
+# - deployジョブを追加(buildジョブ完了後に実行)
+# (APKのReleases公開、パッケージ名 com.lupargent.flutterapptest は v2 と同じ)
 
-name: Flutter Build APK
+name: Flutter Build APK and Web
 
 on:
   push:
@@ -12,6 +14,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   build:
@@ -32,10 +36,10 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Create Android scaffold if missing
+      - name: Create scaffold if missing
         run: |
-          if [ ! -d android ]; then
-            flutter create --platforms=android --org com.lupargent --project-name flutterapptest .
+          if [ ! -d android ] || [ ! -d web ]; then
+            flutter create --platforms=android,web --org com.lupargent --project-name flutterapptest .
           fi
 
       - name: Install dependencies
@@ -53,3 +57,22 @@ jobs:
             "flutterapptest-${{ github.run_number }}.apk" \
             --title "Build ${{ github.run_number }}" \
             --notes "Automated build from commit ${{ github.sha }}"
+
+      - name: Build web
+        run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
