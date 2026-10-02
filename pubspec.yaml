@@ -1,4 +1,8 @@
-name: sample_counter
+# v1からの差分:
+# - name を sample_counter から flutterapptest に変更
+#   (パッケージ名 com.lupargent.flutterapptest に合わせるため)
+
+name: flutterapptest
 description: GitHub Actionsでビルドするサンプルのカウンターアプリ
 publish_to: "none"
 version: 1.0.0+1
