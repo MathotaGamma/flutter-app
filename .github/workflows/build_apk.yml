@@ -7,16 +7,18 @@ on:
 
 env:
   APP_ORG: com.lupargent
+  # プラグイン(ライブラリ)に強制するcompileSdk
+  FORCE_COMPILE_SDK: 36
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -61,6 +63,20 @@ jobs:
           if [ -f build.gradle ]; then
             sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' build.gradle
           fi
+
+      - name: Force compileSdk for plugins
+        run: |
+          mkdir -p ~/.gradle/init.d
+          cat > ~/.gradle/init.d/force-compile-sdk.gradle <<EOF
+          allprojects { p ->
+            p.plugins.withId('com.android.library') {
+              p.afterEvaluate {
+                p.android.compileSdkVersion ${FORCE_COMPILE_SDK}
+              }
+            }
+          }
+          EOF
+          cat ~/.gradle/init.d/force-compile-sdk.gradle
 
       - name: Install dependencies
         run: flutter pub get
